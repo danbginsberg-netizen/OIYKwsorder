@@ -241,8 +241,8 @@ footer .fmotto{font-style:italic;margin-top:8px;color:var(--mauve);}
   <h2>Wholesale Terms</h2>
   <p class="lead">Handmade, color-led jewelry &mdash; ordered the way that suits your store.</p>
   <div class="terms">
-    <div class="trow"><div class="k">Pricing</div><div class="v">Priced by the total pieces of each style: 12 or more at the dozen rate, 6&ndash;11 at the 6-piece rate, 1&ndash;5 at the 3-piece rate.</div></div>
-    <div class="trow"><div class="k">Pack options</div><div class="v">Every style can be ordered by the piece, 6-pk or dozen; scarf-wrapped necklaces also come in a 3-pk. Pack prices are shown on the order table.</div></div>
+    <div class="trow"><div class="k">Pricing</div><div class="v">Priced by the total pieces of each style: 12 or more at the dozen rate, 6&ndash;11 at the 6-piece rate, 3&ndash;5 at the 3-piece rate.</div></div>
+    <div class="trow"><div class="k">Minimums</div><div class="v">Made to order by the dozen: one dozen per style. On a first order, baroque pearl and scarf-wrapped necklaces also come in a 3-pk or 6-pk, and baroque pearl drop earrings in a 6-pk. Reorders are one dozen per style.</div></div>
     <div class="trow"><div class="k">Suggested retail</div><div class="v">MSRP for every style is in the line sheet.</div></div>
     <div class="trow"><div class="k">New customers</div><div class="v">$100 minimum on a first order.</div></div>
     <div class="trow"><div class="k">Shipping</div><div class="v">In-stock styles ship from our U.S. warehouse in about 10 business days.</div></div>
@@ -301,7 +301,8 @@ footer .fmotto{font-style:italic;margin-top:8px;color:var(--mauve);}
     </fieldset>
 
     <div class="searchbar" id="filterRow"><input type="text" id="filter" placeholder="&#128269;  Search by SKU, item, or color…"></div>
-    <div class="legendnote">Enter quantities in any box that applies. <b>Pc</b> = single piece &nbsp;&middot;&nbsp; <b>6-pk</b> = six pieces &nbsp;&middot;&nbsp; <b>Dz</b> = dozen (<b>3-pk</b> on scarf-wrapped necklaces). Each style is priced by its total pieces: 12+ at the dozen rate (WS / piece column), 6&ndash;11 at the 6-piece rate, 1&ndash;5 at the 3-piece rate.</div>
+    <div class="legendnote">Enter quantities in the boxes. <b>Dz</b> = dozen, the minimum for most styles (made to order). On a first order, baroque pearl and scarf-wrapped necklaces also come in a <b>3-pk</b> or <b>6-pk</b>, and baroque pearl drop earrings in a <b>6-pk</b>. Each style is priced by its total pieces: 12+ at the dozen rate (WS / piece column), 6&ndash;11 at the 6-piece rate, 3&ndash;5 at the 3-piece rate.</div>
+    <label class="legendnote" style="display:block;cursor:pointer"><input type="checkbox" id="reorderChk" style="vertical-align:middle;margin-right:6px">This is a reorder (we&rsquo;ve ordered before) &mdash; one dozen per style on every style</label>
     <p class="mobcue">&darr; Each style is a card below &mdash; enter quantities in its boxes.</p>
 
     <div class="tablewrap">
@@ -358,16 +359,26 @@ const PACKS=[                              // order of boxes, small -> large
 ];
 const money = v => "$"+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const tbody=document.getElementById('tbody');
-PRODUCTS.forEach((p,i)=>{
-  const tr=document.createElement('tr');
-  tr.dataset.search=(p.sku+" "+p.name+" "+p.color).toLowerCase();
+// Minimum pieces per style. The factory makes to order by the dozen; only these styles come in smaller sets,
+// and only on a first order. A reorder is one dozen per style on every style. (Same rules as the Capsule Builder.)
+const FIRST_ORDER_MIN = {"OYN0010GDPRL":3,"OYN0011GDPRL":3,"OYN0012GDPRL":3,"OYN0026GDPRL":3,"OYN0015GDSGPRL":3,"OYN0015GDMSTPRL":3,"OYN0015GDBLKPRL":3,"OYN0015GDBLPRL":3,"OYN0015GDBEGPRL":3,"OYN0015GDGRNPRL":3,"OYN0015GDLORPRL":3,"OYN0015GDORPRL":3,"OYN0015GDREDPRL":3,"OYN0015GDTLPRL":3,"OYE0002GDPRL":6,"OYE0006GDPRL":6,"OYE0012GDPRL":6};
+const reorderChk=document.getElementById('reorderChk');
+if(new URLSearchParams(location.search).get('reorder')==='1') reorderChk.checked=true;
+const minOf = p => reorderChk.checked ? 12 : (FIRST_ORDER_MIN[p.sku] || 12);
+function boxesHTML(p,i){
   let boxes="";
   PACKS.forEach(pk=>{
-    if(p[pk.k]==null) return;             // pack not offered for this item
+    if(p[pk.k]==null || pk.units<minOf(p)) return;   // pack not offered for this style, or below its minimum
     const price = pk.showPrice ? `<span class="qp">${money(p[pk.k])}</span>` : "";
     boxes+=`<span class="qg"><span class="ql">${pk.lbl}</span>`+
            `<input class="qty" type="number" min="0" step="1" inputmode="numeric" data-i="${i}" data-k="${pk.k}">${price}</span>`;
   });
+  return boxes;
+}
+PRODUCTS.forEach((p,i)=>{
+  const tr=document.createElement('tr');
+  tr.dataset.search=(p.sku+" "+p.name+" "+p.color).toLowerCase();
+  const boxes=boxesHTML(p,i);
   tr.innerHTML=`<td class="num">${i+1}</td><td class="sku" data-label="SKU">${p.sku}</td><td class="style" data-label="Style">${p.name}</td><td data-label="Color">${p.color}</td>
     <td class="r" data-label="WS / piece">${money(p.pc)}</td><td class="r" data-label="WS / dozen">${money(p.dz)}</td>
     <td class="order" data-label="Quantity">${boxes}</td>
@@ -405,6 +416,16 @@ function recalc(){
   document.getElementById('tval').textContent=money(totalVal);
 }
 tbody.addEventListener('input',e=>{if(e.target.classList.contains('qty'))recalc();});
+// switching to/from a reorder redraws each style's boxes (keeping quantities in the boxes that remain)
+reorderChk.addEventListener('change',()=>{
+  PRODUCTS.forEach((p,i)=>{
+    const keep={}; document.querySelectorAll(`input.qty[data-i="${i}"]`).forEach(inp=>{keep[inp.dataset.k]=inp.value;});
+    const cell=document.querySelector(`[data-lt="${i}"]`).previousElementSibling;
+    cell.innerHTML=boxesHTML(p,i);
+    cell.querySelectorAll('input.qty').forEach(inp=>{if(keep[inp.dataset.k])inp.value=keep[inp.dataset.k];});
+  });
+  recalc();
+});
 document.getElementById('filter').addEventListener('input',e=>{
   const q=e.target.value.toLowerCase();
   document.querySelectorAll('#tbody tr').forEach(tr=>{tr.style.display=tr.dataset.search.includes(q)?'':'none';});
@@ -429,8 +450,8 @@ document.getElementById('submitBtn').addEventListener('click',async()=>{
   const form=document.getElementById('orderForm');
   if(!form.reportValidity())return;
   const lines=buildSummary();
-  if(lines.length===0){alert("Please enter a quantity in at least one box (Pc, 3-pk, 6-pk, or Dz).");return;}
-  const summary=lines.join("\n\n")
+  if(lines.length===0){alert("Please enter a quantity in at least one box (Dz, or 3-pk / 6-pk where offered).");return;}
+  const summary=(reorderChk.checked?"ORDER TYPE:   Reorder (one dozen per style)":"ORDER TYPE:   First order")+"\n\n"+lines.join("\n\n")
     +"\n\n————————————————————————\n"
     +"ORDER TOTAL:   "+totalPieces+" pieces   =   "+money(totalVal);
   const cust=gv('customer_email');
